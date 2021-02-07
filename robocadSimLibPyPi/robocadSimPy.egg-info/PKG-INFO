@@ -1,12 +1,12 @@
 Metadata-Version: 1.1
 Name: robocadSimPy
-Version: 0.0.3.2
+Version: 0.0.4.0
 Summary: python lib for robocadSim
-Home-page: https://github.com/CrackAndDie/robocadSim
+Home-page: https://github.com/CADindustries/robocadSim
 Author: Abdrakov Airat
 Author-email: robocadsim@gmail.com
 License: MIT
-Download-URL: https://github.com/CrackAndDie/robocadSim
+Download-URL: https://github.com/CADindustries/robocadSim
 Description: UNKNOWN
 Keywords: simulator,robocadSim,robot
 Platform: UNKNOWN

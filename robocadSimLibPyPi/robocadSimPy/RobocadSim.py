@@ -1,31 +1,28 @@
-# from .data import PycForPy
+import threading
 from .data import PyForPy
 
 
 class RE21mini:
 
     def __init__(self):
-        # create RobocadSim class from .pyc file
-        self.rc = PyForPy.RobocadSim()
-
         # for user
         self.right_motor_speed = 0.0
         self.left_motor_speed = 0.0
         self.back_motor_speed = 0.0
 
         self.lift_motor_speed = 0.0
-        self.angle_for_big = 0.0
-        self.dir_for_small = 0.0
+        self.angle_to_big = 0.0
+        self.dir_to_plates = 0.0
 
         self.right_motor_enc = 0.0
         self.left_motor_enc = 0.0
         self.back_motor_enc = 0.0
         self.lift_motor_enc = 0.0
 
-        self.reset_right_enc = False
-        self.reset_left_enc = False
-        self.reset_back_enc = False
-        self.reset_lift_enc = False
+        self.reset_right_motor_enc = False
+        self.reset_left_motor_enc = False
+        self.reset_back_motor_enc = False
+        self.reset_lift_motor_enc = False
 
         self.reset_gyro = False
 
@@ -37,72 +34,82 @@ class RE21mini:
         self.left_us = 0.0
         self.right_ir = 0.0
         self.left_ir = 0.0
-        self.navX = 0.0
+        self.gyro = 0.0
 
-        self.image_from_camera = None
         self.bytes_from_camera = None
 
-    #
-    #
-    #
-    #                            NON VOID FUNCTIONS
-    #
-    #
-    #
+        # for dev
+        self.__connected = False
 
-    def write_motors(self, right: float, left: float, back: float):
-        self.rc.write_motors(right, left, back)
+        port_motors = 65432
+        port_oms = 65433
+        port_resets = 65434
+        port_encoders = 65435
+        port_sensors = 65436
+        port_buttons = 65437
+        port_camera = 65438
 
-    def write_oms(self, lift: float, big: float, small: float):
-        self.rc.write_oms(lift, big, small)
+        self.__talk_motors = PyForPy.TalkPort(port_motors)
+        self.__talk_oms = PyForPy.TalkPort(port_oms)
+        self.__talk_resets = PyForPy.TalkPort(port_resets)
+        self.__listen_encoders = PyForPy.ListenPort(port_encoders)
+        self.__listen_sensors = PyForPy.ListenPort(port_sensors)
+        self.__listen_buttons = PyForPy.ListenPort(port_buttons)
+        self.__listen_camera = PyForPy.ListenPort(port_camera, True)
 
-    def write_reset(self, right: bool, left: bool, back: bool, lift: bool, gyro: bool):
-        self.rc.write_reset(right, left, back, lift, gyro)
+    def connect(self):
+        self.__connected = True
+        client_thread = threading.Thread(target=self.__connect, args=())
+        client_thread.start()
 
-    def read_encs(self):
-        return self.rc.read_encs()
+    def __connect(self):
+        self.__talk_motors.start_talking()
+        self.__talk_oms.start_talking()
+        self.__talk_resets.start_talking()
+        self.__listen_encoders.start_listening()
+        self.__listen_sensors.start_listening()
+        self.__listen_buttons.start_listening()
+        self.__listen_camera.start_listening()
+        local_exit = True
+        while local_exit:
+            self.__talk_motors.out_string = PyForPy.ParseChannels.join_float_channel([self.right_motor_speed,
+                                                                                      self.left_motor_speed,
+                                                                                      self.back_motor_speed])
+            self.__talk_oms.out_string = PyForPy.ParseChannels.join_float_channel([self.lift_motor_speed,
+                                                                                   self.angle_to_big,
+                                                                                   self.dir_to_plates])
+            self.__talk_resets.out_string = PyForPy.ParseChannels.join_bool_channel([self.reset_right_motor_enc,
+                                                                                     self.reset_left_motor_enc,
+                                                                                     self.reset_back_motor_enc,
+                                                                                     self.reset_lift_motor_enc,
+                                                                                     self.reset_gyro])
+            encoders_list = PyForPy.ParseChannels.parse_float_channel(self.__listen_encoders.out_string)
+            if len(encoders_list) == 4:
+                self.right_motor_enc = encoders_list[0]
+                self.left_motor_enc = encoders_list[1]
+                self.back_motor_enc = encoders_list[2]
+                self.lift_motor_enc = encoders_list[3]
+            sensors_list = PyForPy.ParseChannels.parse_float_channel(self.__listen_sensors.out_string)
+            if len(sensors_list) == 5:
+                self.right_us = sensors_list[0]
+                self.left_us = sensors_list[1]
+                self.right_ir = sensors_list[2]
+                self.left_ir = sensors_list[3]
+                self.gyro = sensors_list[4]
+            buttons_list = PyForPy.ParseChannels.parse_bool_channel(self.__listen_buttons.out_string)
+            if len(buttons_list) == 3:
+                self.button_ems = buttons_list[0]
+                self.button_start = buttons_list[1]
+                self.button_limit = buttons_list[2]
+            self.bytes_from_camera = self.__listen_camera.out_bytes
+            local_exit = self.__connected
 
-    def read_sensors(self):
-        return self.rc.read_sensors()
-
-    def read_buttons(self):
-        return self.rc.read_buttons()
-
-    def read_camera(self):
-        return self.rc.read_camera()
-
-    def read_camera_bytes(self):
-        return self.rc.read_camera_bytes()
-
-    #
-    #
-    #
-    #                            VOID FUNCTIONS
-    #
-    #
-    #
-
-    def write_motors_void(self):
-        self.rc.write_motors(self.right_motor_speed, self.left_motor_speed, self.back_motor_speed)
-
-    def write_oms_void(self):
-        self.rc.write_oms(self.lift_motor_speed, self.angle_for_big, self.dir_for_small)
-
-    def write_reset_void(self):
-        self.rc.write_reset(self.reset_right_enc, self.reset_left_enc, self.reset_back_enc, self.reset_lift_enc,
-                            self.reset_gyro)
-
-    def read_encs_void(self):
-        (self.right_motor_enc, self.left_motor_enc, self.back_motor_enc, self.lift_motor_enc) = self.rc.read_encs()
-
-    def read_sensors_void(self):
-        (self.right_us, self.left_us, self.right_ir, self.left_ir, self.navX) = self.rc.read_sensors()
-
-    def read_buttons_void(self):
-        (self.button_ems, self.button_start, self.button_limit) = self.rc.read_buttons()
-
-    def read_camera_void(self):
-        self.image_from_camera = self.rc.read_camera()
-
-    def read_camera_bytes_void(self):
-        self.bytes_from_camera = self.rc.read_camera_bytes()
+    def disconnect(self):
+        self.__connected = False
+        self.__talk_motors.stop_talking()
+        self.__talk_oms.stop_talking()
+        self.__talk_resets.stop_talking()
+        self.__listen_encoders.stop_listening()
+        self.__listen_sensors.stop_listening()
+        self.__listen_buttons.stop_listening()
+        self.__listen_camera.stop_listening()
