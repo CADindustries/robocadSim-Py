@@ -20,13 +20,19 @@ class ListenPort:
         sct = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
         sct.connect(('127.0.0.1', self.__port))
         while not self.__stop_thread:
-            buffer_size = 256
+            buffer_size = 1024
             if self.__is_camera:
-                data = sct.recv(256)
-                buffer_size = int(data)
+                data = sct.recv(1024)
+                # anyway there are errors sometimes, idk why
+                try:
+                    buffer_size = int(data.decode('utf-16-le')) + 4096
+                except (Exception, ValueError) as e:
+                    sct.sendall(b'Received')
+                    buffer_size = int(data.decode('utf-16-le'))
                 sct.sendall(b'Received')
             self.out_bytes = sct.recv(buffer_size)
-            self.out_string = repr(self.out_bytes)
+            if not self.__is_camera:
+                self.out_string = self.out_bytes.decode('utf-16-le')
             sct.sendall(b'Received')
         sct.shutdown(socket.SHUT_RDWR)
         sct.close()
@@ -56,9 +62,9 @@ class TalkPort:
         sct = socket.socket(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP)
         sct.connect(('127.0.0.1', self.__port))
         while not self.__stop_thread:
-            sct.sendall(bytes(self.out_string))
-            buffer_size = 256
-            repr(sct.recv(buffer_size))  # server answer
+            buffer_size = 1024
+            ans = sct.recv(buffer_size).decode('utf-16-le')  # server answer
+            sct.sendall(self.out_string.encode('utf-16-le'))
         sct.shutdown(socket.SHUT_RDWR)
         sct.close()
 
@@ -73,11 +79,17 @@ class TalkPort:
 class ParseChannels:
     @staticmethod
     def parse_float_channel(txt: str):
-        return list(map(float, txt.split(';')))
+        try:
+            return list(map(float, txt.replace(',', '.').split(';')))
+        except (Exception, ValueError) as e:
+            return list()
 
     @staticmethod
     def parse_bool_channel(txt: str):
-        return list(map(bool, map(int, txt.split(';'))))
+        try:
+            return list(map(bool, map(int, txt.split(';'))))
+        except (Exception, ValueError) as e:
+            return list()
 
     @staticmethod
     def join_float_channel(lst: list):
